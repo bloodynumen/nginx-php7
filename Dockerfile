@@ -1,4 +1,4 @@
-FROM centos:7
+FROM local/c7-systemd
 MAINTAINER Skiychan <dev@skiy.net>
 
 ENV NGINX_VERSION 1.13.9
@@ -32,7 +32,10 @@ RUN set -x && \
     python-setuptools && \
 #Add user
     mkdir -p /data/{www,phpextini,phpextfile} && \
-    useradd -r -s /sbin/nologin -d /data/www -m -k no www && \
+    useradd sun && \
+    groupadd staff && \
+    usermod -a -G staff sun && \
+    # useradd -r -s /sbin/nologin -d /data/www -m -k no www && \
 #Download nginx & php
     mkdir -p /home/nginx-php && cd $_ && \
     curl -Lk http://nginx.org/download/nginx-$NGINX_VERSION.tar.gz | gunzip | tar x -C /home/nginx-php && \
@@ -40,7 +43,6 @@ RUN set -x && \
 #Make install nginx
     cd /home/nginx-php/nginx-$NGINX_VERSION && \
     ./configure --prefix=/usr/local/nginx \
-    --user=www --group=www \
     --error-log-path=/var/log/nginx_error.log \
     --http-log-path=/var/log/nginx_access.log \
     --pid-path=/var/run/nginx.pid \
@@ -55,8 +57,6 @@ RUN set -x && \
     ./configure --prefix=/usr/local/php \
     --with-config-file-path=/usr/local/php/etc \
     --with-config-file-scan-dir=/data/phpextini \
-    --with-fpm-user=www \
-    --with-fpm-group=www \
     --with-mcrypt=/usr/include \
     --with-mysqli \
     --with-pdo-mysql \
@@ -116,28 +116,30 @@ RUN set -x && \
     mkdir -p --mode=0755 /var/cache/{yum,ldconfig} && \
     find /var/log -type f -delete && \
     rm -rf /home/nginx-php && \
-#Change Mod from webdir
-    chown -R www:www /data/www
+
 
 #Add supervisord conf
 ADD supervisord.conf /etc/
 
 #Create web folder
-# WEB Folder: /data/www
+# WEB Folder: /home/sun/projects
 # SSL Folder: /usr/local/nginx/conf/ssl
 # Vhost Folder: /usr/local/nginx/conf/vhost
 # php extfile ini Folder: /usr/local/php/etc/conf.d
 # php extfile Folder: /data/phpextfile
 VOLUME ["/data/www", "/usr/local/nginx/conf/ssl", "/usr/local/nginx/conf/vhost", "/data/phpextini", "/data/phpextfile"]
 
-ADD index.php /data/www/
+#ADD index.php /data/www/
 
 #Add ext setting to image
-#ADD extini/ /data/phpextini/
-#ADD extfile/ /data/phpextfile/
+ADD extini/ /data/phpextini/
+ADD extfile/ /data/phpextfile/
 
 #Update nginx config
 ADD nginx.conf /usr/local/nginx/conf/
+
+#Update php-fpm config
+ADD php-fpm.conf /usr/local/php/etc/
 
 #Start
 ADD start.sh /
